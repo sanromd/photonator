@@ -11,7 +11,7 @@
 | 2c | Update README.md | ✅ Complete |
 | 3 | Inelastic scattering (fluorescence, Raman) | 📋 Planned — stubs in place |
 | 4 | Spectral / wideband support | 📋 Planned — stubs in place |
-| 5 | Full beam profile implementations (LG, Bessel, Airy) | 📋 Planned — stubs in place |
+| 5 | Beam profile tests + comparison notebook | ✅ Complete |
 | 6 | Advanced media (Oil dispersion, FluorescentMedium) | 📋 Planned — stubs in place |
 
 ---
@@ -23,7 +23,7 @@
 - `Simulation` orchestrator (`simulation.py`): n_batches × n_photons, pluggable beam/medium/phase_fn/receiver, CPU/GPU dispatch.
 - `Receiver` (`core/receiver.py`): Fresnel transmission, TIR test, aperture, FOV cone, Welford online stats.
 
-**Beams** — `GaussianBeam` fully implemented (Rayleigh CDF, thin-lens divergence); `LaguerreGaussianBeam`, `BesselBeam`, `AiryBeam` are class stubs with physics documented but sampling not yet implemented.
+**Beams** — all four fully implemented: `GaussianBeam` (Rayleigh CDF, thin-lens divergence), `LaguerreGaussianBeam` (rejection sampling, LG profile), `BesselBeam` (J₀² rejection sampling), `AiryBeam` (2D separable Airy rejection sampling). 23 unit tests in `tests/test_beams.py`; `notebooks/03_beam_profiles.ipynb` shows side-by-side intensity maps with theoretical overlays.
 
 **Phase functions** — `HenyeyGreenstein` (analytical CDF), `PetzoldPhaseFunction` (tabulated ocean VSF from HDF5), `MiePhaseFunction` (tabulated).
 
@@ -66,9 +66,11 @@ Needed:
 - `BroadbandGaussianBeam` (spectral power distribution)
 - Spectral power accumulation in `SimulationResult`
 
-### Phase 5 — Complete Beam Profiles
+### Phase 5 — Beam Profile Tests and Comparison Notebook ✅
 
-`LaguerreGaussianBeam`, `BesselBeam`, and `AiryBeam` exist as class stubs. The physics and rejection-sampling patterns are documented in `architecture.md`. `initialize()` sampling needs to be implemented for each.
+All three beams were already fully implemented (not stubs). Phase 5 delivered:
+- `tests/test_beams.py`: 23 tests across Gaussian, LG, Bessel, and Airy covering unit direction cosines, position support bounds, profile-shape invariants (donut zero, Bessel central peak, Airy first-lobe offset), and transverse scaling.
+- `notebooks/03_beam_profiles.ipynb`: side-by-side 2D intensity maps, radial profiles vs analytical curves, uz cone structure, and summary statistics table.
 
 ### Phase 6 — Advanced Media
 
