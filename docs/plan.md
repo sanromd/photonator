@@ -12,7 +12,7 @@
 | 3 | Inelastic scattering (fluorescence, Raman) | 📋 Planned — stubs in place |
 | 4 | Spectral / wideband support | 📋 Planned — stubs in place |
 | 5 | Beam profile tests + comparison notebook | ✅ Complete |
-| 6 | Advanced media (Oil dispersion, FluorescentMedium) | 📋 Planned — stubs in place |
+| 6 | Advanced media (DispersiveOil, FluorescentMedium) | ✅ Complete |
 
 ---
 
@@ -72,7 +72,16 @@ All three beams were already fully implemented (not stubs). Phase 5 delivered:
 - `tests/test_beams.py`: 23 tests across Gaussian, LG, Bessel, and Airy covering unit direction cosines, position support bounds, profile-shape invariants (donut zero, Bessel central peak, Airy first-lobe offset), and transverse scaling.
 - `notebooks/03_beam_profiles.ipynb`: side-by-side 2D intensity maps, radial profiles vs analytical curves, uz cone structure, and summary statistics table.
 
-### Phase 6 — Advanced Media
+### Phase 6 — Advanced Media ✅
 
-- `OilMedium`: Kramers-Kronig dispersion for wavelength-dependent IOR (stub).
-- `FluorescentMedium`: bulk fluorophore model (depends on Phase 3 `inelastic_yield`).
+`DispersiveOil` (in `photonator/media/oil.py`):
+- Cauchy/Sellmeier dispersion: n(λ) = A + B/λ_μm² + C/λ_μm⁴, calibrated at 589 nm.
+- `n_at(wavelength_nm)` for stateless evaluation without mutating instance state.
+- Numerical Kramers-Kronig: optional `k_wavelengths_nm` + `k_spectrum` input; integrates n(ω₀) = 1 + (2/π) P∫ ω k(ω)/(ω²−ω₀²) dω.
+- Falls back to fixed n from `Oil` when `wavelength_nm` is None.
+
+`FluorescentMedium` (`photonator/media/fluorescent.py`):
+- Wraps any `AbstractMedium` host, adds `mu_a_ex_per_m` fluorophore absorption.
+- Sets `inelastic_yield` = `quantum_yield` and `emission_wavelength_nm` for Phase 3 propagation loop hook.
+- `from_concentration(concentration_mol_per_L, molar_extinction_L_per_mol_cm, ...)` classmethod via Beer-Lambert conversion.
+- 32 tests in `tests/test_advanced_media.py`; 93 total tests passing.

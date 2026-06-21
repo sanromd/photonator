@@ -20,7 +20,7 @@ Working branch: `claude/refactor-photonator-python-nnre4`
 | 3 | Inelastic scattering (fluorescence, Raman) | 📋 Planned — stubs in place |
 | 4 | Spectral / wideband support | 📋 Planned — stubs in place |
 | 5 | Beam profile tests + comparison notebook | ✅ Complete |
-| 6 | Advanced media (Oil dispersion, FluorescentMedium) | 📋 Planned — stubs in place |
+| 6 | Advanced media (DispersiveOil, FluorescentMedium) | ✅ Complete |
 
 ---
 
