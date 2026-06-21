@@ -10,3 +10,5 @@ build/
 .mypy_cache/
 *.h5
 *.hdf5
+!data/*.h5
+!data/*.hdf5

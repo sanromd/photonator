@@ -1,4 +1,4 @@
-"""scipy.io.loadmat wrapper for loading MATLAB .mat data files."""
+"""Loaders for legacy MATLAB .mat files and HDF5 data files."""
 
 from __future__ import annotations
 
@@ -6,6 +6,23 @@ from pathlib import Path
 
 import numpy as np
 import scipy.io as _sio
+
+
+def load_hdf5_array(path: Path | str, variable: str) -> np.ndarray:
+    """Load a dataset from an HDF5 file.
+
+    Parameters
+    ----------
+    path : path to the .h5 file
+    variable : HDF5 dataset name
+
+    Returns
+    -------
+    numpy array (dtype float64)
+    """
+    import h5py
+    with h5py.File(str(path), "r") as f:
+        return np.array(f[variable], dtype=np.float64)
 
 
 def load_mat_array(path: Path | str, variable: str) -> np.ndarray:
