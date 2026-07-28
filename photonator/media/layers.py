@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from photonator.media.base import AbstractMedium
+
+if TYPE_CHECKING:
+    from photonator.phase_functions.base import AbstractPhaseFunction
 
 
 @dataclass
@@ -19,11 +23,14 @@ class Layer:
     z_start_m : start of layer (m, inclusive)
     z_end_m : end of layer (m, exclusive for all but the last layer)
     medium : optical medium for this layer
+    phase_fn : optional layer-specific phase function; when None the
+        propagation loop falls back to the simulation's global one
     """
 
     z_start_m: float
     z_end_m: float
     medium: AbstractMedium
+    phase_fn: AbstractPhaseFunction | None = None
 
 
 class LayeredMedium(AbstractMedium):
@@ -48,6 +55,11 @@ class LayeredMedium(AbstractMedium):
         layers = sorted(layers, key=lambda l: l.z_start_m)
         self._layers = layers
         self._z_starts = np.array([l.z_start_m for l in layers])
+
+    @property
+    def layers(self) -> list[Layer]:
+        """The ordered list of layers (ascending z_start_m)."""
+        return self._layers
 
     def layer_at(self, z_m: float) -> Layer:
         """Return the layer containing axial position z_m."""

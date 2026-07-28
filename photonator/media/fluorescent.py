@@ -94,6 +94,16 @@ class FluorescentMedium(AbstractMedium):
     def quantum_yield(self) -> float:
         return self.inelastic_yield  # type: ignore[return-value]
 
+    def emission_medium(self) -> AbstractMedium:
+        """Medium seen by re-emitted photons: the host at the emission wavelength.
+
+        Re-absorption by the fluorophore at the emission wavelength is
+        neglected (single-generation fluorescence), so the fluorophore's
+        excitation absorption is dropped and the host's spectral model —
+        if any — is evaluated at ``emission_wavelength_nm``.
+        """
+        return self._host.at_wavelength(self.emission_wavelength_nm)
+
     # ── Alternative constructor ───────────────────────────────────────────────
 
     @classmethod

@@ -32,7 +32,8 @@ _SALT_SCATTER_SCALE: dict[str, float] = {
 }
 
 # Pure water baseline (Pope & Fry at 532 nm)
-_PURE_WATER_MU_A_532: float = 0.0088   # m^-1
+# Pope & Fry (1997) pure-water absorption at 532 nm (see media/water.py table)
+_PURE_WATER_MU_A_532: float = 0.0442   # m^-1
 _PURE_WATER_MU_S_532: float = 0.037    # m^-1 (Petzold clear)
 _PURE_WATER_G: float = 0.93
 

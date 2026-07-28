@@ -14,12 +14,48 @@ import numpy as np
 from numpy.typing import NDArray
 
 from photonator.beam.base import AbstractBeam
+from photonator.core.photon import PhotonBatch
 from photonator.core.propagation import propagate_cpu
+from photonator.core.propagation_layered import propagate_layered_cpu
 from photonator.core.receiver import Receiver
 from photonator.media.base import AbstractMedium
+from photonator.media.layers import GradientMedium, LayeredMedium
 from photonator.phase_functions.base import AbstractPhaseFunction
 
 Backend = Literal["cpu", "numba", "cupy"]
+
+
+def _fluorescence_active(medium: AbstractMedium) -> bool:
+    """True when the medium carries an active fluorophore (Phase 3 hooks)."""
+    qy = getattr(medium, "inelastic_yield", None) or 0.0
+    mu_a_f = getattr(medium, "mu_a_fluorophore_per_m", 0.0) or 0.0
+    return qy > 0.0 and mu_a_f > 0.0 and getattr(medium, "emission_wavelength_nm", None) is not None
+
+
+def _make_emission_batch(
+    src: PhotonBatch, mask: NDArray[np.bool_], rng: np.random.Generator
+) -> PhotonBatch:
+    """Build the emission-pass batch from fluoresced photons.
+
+    Positions, weights, and accumulated path lengths carry over from the
+    conversion points; directions are re-drawn isotropically (fluorescence
+    emission has no angular memory of the excitation photon).
+    """
+    m = int(np.sum(mask))
+    b = PhotonBatch(m, rng=rng)
+    b.x_m[:] = src.x_m[mask]
+    b.y_m[:] = src.y_m[mask]
+    b.z_m[:] = src.z_m[mask]
+    b.weight[:] = src.weight[mask]
+    b._path_length_m[:] = src._path_length_m[mask]
+
+    uz = rng.uniform(-1.0, 1.0, m)
+    phi = rng.uniform(0.0, 2.0 * np.pi, m)
+    sin_polar = np.sqrt(np.maximum(1.0 - uz**2, 0.0))
+    b.ux[:] = sin_polar * np.cos(phi)
+    b.uy[:] = sin_polar * np.sin(phi)
+    b.uz[:] = uz
+    return b
 
 
 @dataclass
@@ -38,6 +74,12 @@ class SimulationResult:
     dist_var: float = 0.0
     weight_mean: float = 0.0        # normalized: total_power / n_photons
     reflected: int = 0              # photons rejected at critical angle
+
+    # Fluorescence channel (Phase 3; zero unless the medium has active hooks)
+    fluorescent_power: float = 0.0      # detected power at the emission wavelength
+    fluorescent_packets: int = 0        # detected fluorescence photons
+    fluoresced_photons: int = 0         # photons converted (detected or not)
+    emission_wavelength_nm: float | None = None
 
     # Run metadata
     n_photons: int = 0              # total photons launched (n_photons * n_batches)
@@ -93,6 +135,21 @@ class Simulation:
         t0 = time.perf_counter()
         self.receiver.reset()
 
+        if isinstance(self.medium, GradientMedium):
+            raise NotImplementedError(
+                "GradientMedium propagation (adaptive sub-stepping) is not yet wired "
+                "into the loop; discretise the gradient into a LayeredMedium instead."
+            )
+        is_layered = isinstance(self.medium, LayeredMedium)
+        fluor_active = _fluorescence_active(self.medium)
+        if (is_layered or fluor_active) and self.backend != "cpu":
+            raise NotImplementedError(
+                "Layered and fluorescent propagation are CPU-only for now; "
+                'use backend="cpu".'
+            )
+        fluor_receiver = self.receiver.clone() if fluor_active else None
+        n_fluoresced = 0
+
         all_rec_loc: list[NDArray] = []
         all_dist: list[NDArray] = []
         all_weights: list[NDArray] = []
@@ -104,7 +161,8 @@ class Simulation:
             batch = self.beam.initialize(self.n_photons, rng)
 
             if self.backend == "cpu":
-                _elapsed, rec_loc, distances_m, rec_weights, _n_packets = propagate_cpu(
+                propagate = propagate_layered_cpu if is_layered else propagate_cpu
+                _elapsed, rec_loc, distances_m, rec_weights, _n_packets = propagate(
                     batch, self.medium, self.phase_fn, self.receiver
                 )
             elif self.backend == "cupy":
@@ -130,6 +188,25 @@ class Simulation:
                 all_dist.append(distances_m)
                 all_weights.append(rec_weights)
 
+            # Emission pass: re-propagate fluoresced photons isotropically
+            # in the host medium at the emission wavelength (single
+            # generation — re-absorption by the fluorophore is neglected).
+            if fluor_active:
+                fl_mask = batch.fluoresced_mask
+                n_fl = int(np.sum(fl_mask))
+                n_fluoresced += n_fl
+                if n_fl > 0:
+                    emission_batch = _make_emission_batch(batch, fl_mask, rng)
+                    emission_medium = (
+                        self.medium.emission_medium()
+                        if hasattr(self.medium, "emission_medium")
+                        else self.medium
+                    )
+                    _e2, rec_loc2, dist2, w2, _p2 = propagate_cpu(
+                        emission_batch, emission_medium, self.phase_fn, self.receiver
+                    )
+                    fluor_receiver.detect(rec_loc2, dist2, w2, total_n_tx)
+
         elapsed_s = time.perf_counter() - t0
 
         n_det = self.receiver._count
@@ -142,6 +219,12 @@ class Simulation:
             dist_var=self.receiver._dist_M2 / max(n_det - 1, 1),
             weight_mean=self.receiver._power / max(total_n_tx, 1),
             reflected=self.receiver._reflected,
+            fluorescent_power=fluor_receiver._power if fluor_active else 0.0,
+            fluorescent_packets=fluor_receiver._count if fluor_active else 0,
+            fluoresced_photons=n_fluoresced,
+            emission_wavelength_nm=(
+                getattr(self.medium, "emission_wavelength_nm", None) if fluor_active else None
+            ),
             n_photons=total_n_tx,
             n_batches=self.n_batches,
             elapsed_s=elapsed_s,

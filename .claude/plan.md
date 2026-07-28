@@ -17,8 +17,8 @@ Working branch: `claude/refactor-photonator-python-nnre4`
 | 2a | Repo housekeeping (archive MATLAB, migrate data files) | ✅ Complete |
 | 2b | micromamba environment YAML | ✅ Complete |
 | 2c | Update README.md | ✅ Complete |
-| 3 | Inelastic scattering (fluorescence, Raman) | 📋 Planned — stubs in place |
-| 4 | Spectral / wideband support | 📋 Planned — stubs in place |
+| 3 | Inelastic scattering (fluorescence) | ✅ Complete — two-pass emission propagation |
+| 4 | Spectral / wideband support | ✅ Complete — at_wavelength API + SpectralSimulation |
 | 5 | Beam profile tests + comparison notebook | ✅ Complete |
 | 6 | Advanced media (DispersiveOil, FluorescentMedium) | ✅ Complete |
 

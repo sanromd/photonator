@@ -66,6 +66,17 @@ class AbstractMedium(ABC):
         c = self.mu_t_per_m
         return self.mu_s_per_m / c if c > 0 else 0.0
 
+    def at_wavelength(self, wavelength_nm: float) -> AbstractMedium:
+        """Return a medium instance evaluated at the given wavelength.
+
+        Spectral media (Water, TabulatedMedium, DispersiveOil) override
+        this to interpolate their property tables.  The default
+        implementation returns ``self`` unchanged — appropriate for media
+        with no spectral data, where properties are wavelength-independent
+        by assumption.
+        """
+        return self
+
     @classmethod
     def from_file(cls, path: Path | str) -> TabulatedMedium:
         """Load a custom medium from an HDF5 or CSV spectral file.
@@ -125,6 +136,13 @@ class TabulatedMedium(AbstractMedium):
     @property
     def n(self) -> float:
         return self._interp(self._n)
+
+    def at_wavelength(self, wavelength_nm: float) -> TabulatedMedium:
+        """Return a view of this medium's tables at another wavelength."""
+        return TabulatedMedium(
+            self._wl_nm, self._mu_a, self._mu_s, self._g, self._n,
+            wavelength_nm=wavelength_nm,
+        )
 
     @classmethod
     def load(cls, path: Path) -> TabulatedMedium:

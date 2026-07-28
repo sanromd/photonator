@@ -100,6 +100,8 @@ class Receiver:
         self.receiver_z_m = receiver_z_m
         self.pos_x_m = pos_x_m
         self.pos_y_m = pos_y_m
+        self.aperture_m = aperture_m
+        self.fov_rad = fov_rad
         self.radius_m = aperture_m / 2.0
         self.cos_fov_half = float(np.cos(fov_rad / 2.0))
         self.n_water = n_water
@@ -204,6 +206,22 @@ class Receiver:
             reflected=self._reflected,
         )
         return result
+
+    def clone(self) -> Receiver:
+        """Return a fresh Receiver with identical geometry and zeroed statistics.
+
+        Used to track separate detection channels (e.g. the fluorescence
+        emission pass) or per-wavelength bins with the same physical receiver.
+        """
+        return Receiver(
+            receiver_z_m=self.receiver_z_m,
+            pos_x_m=self.pos_x_m,
+            pos_y_m=self.pos_y_m,
+            aperture_m=self.aperture_m,
+            fov_rad=self.fov_rad,
+            n_water=self.n_water,
+            n_air=self.n_air,
+        )
 
     def reset(self) -> None:
         """Clear accumulated statistics."""

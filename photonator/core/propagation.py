@@ -17,6 +17,7 @@ from photonator.constants import ROULETTE_CONST, ROULETTE_CONST_INV, min_weight_
 from photonator.core.photon import (
     ACTIVE,
     DETECTED,
+    FLUORESCED,
     TERMINATED,
     PhotonBatch,
 )
@@ -65,18 +66,37 @@ def propagate_cpu(
     t0 = time.perf_counter()
 
     n = batch.n
-    c_per_m = medium.mu_a_per_m + medium.mu_s_per_m
-    a_per_m = medium.mu_a_per_m
-    albedo = (c_per_m - a_per_m) / c_per_m if c_per_m > 0 else 0.0
-    prob_survival = albedo
+    mu_a = medium.mu_a_per_m
+    mu_s = medium.mu_s_per_m
+    c_per_m = mu_a + mu_s
+    albedo = mu_s / c_per_m if c_per_m > 0 else 0.0
+
+    # Inelastic hooks (Phase 3): when the medium carries an active
+    # fluorophore, each interaction either scatters elastically or converts
+    # the photon to a fluorescence photon (status=FLUORESCED) with
+    # probability p_fluor.  The implicit-capture survival factor grows from
+    # the elastic albedo mu_s/c to (mu_s + mu_a_f*QY)/c because the
+    # re-emitted fraction of fluorophore absorption is not lost.
+    qy = getattr(medium, "inelastic_yield", None) or 0.0
+    mu_a_f = getattr(medium, "mu_a_fluorophore_per_m", 0.0) or 0.0
+    emission_nm = getattr(medium, "emission_wavelength_nm", None)
+    if qy > 0.0 and mu_a_f > 0.0 and emission_nm is not None:
+        prob_survival = (mu_s + mu_a_f * qy) / c_per_m
+        p_fluor = (mu_a_f * qy) / (mu_s + mu_a_f * qy)
+    else:
+        prob_survival = albedo
+        p_fluor = 0.0
+
     inv_c = 1.0 / c_per_m
-    min_w = min_weight_for_albedo(albedo)
+    min_w = min_weight_for_albedo(prob_survival)
     receiver_z_m = receiver.receiver_z_m
     rng = batch.rng
 
     rec_loc = np.zeros((n, 5), dtype=np.float64)
     rec_dist = np.zeros(n, dtype=np.float64)
-    total_dist = np.zeros(n, dtype=np.float64)
+    # Accumulate in the batch's path-length array so a fluorescence
+    # emission pass can carry over the distance travelled before conversion.
+    total_dist = batch._path_length_m
     total_rec_packets = 0
 
     while batch.n_active > 0:
@@ -199,6 +219,19 @@ def propagate_cpu(
             sel = sel[still_act_mask]
             if len(ncidx) == 0:
                 continue
+
+            # Inelastic conversion: interaction is fluorescent with
+            # probability p_fluor.  Converted photons stop elastic
+            # propagation here; a second pass re-emits them isotropically
+            # at the emission wavelength (see Simulation.run).
+            if p_fluor > 0.0:
+                converts = rng.random(len(ncidx)) < p_fluor
+                if np.any(converts):
+                    batch.status[ncidx[converts]] = float(FLUORESCED)
+                    ncidx = ncidx[~converts]
+                    sel = sel[~converts]
+                if len(ncidx) == 0:
+                    continue
 
             # Update direction cosines
             ux_new, uy_new, uz_new = update_direction(

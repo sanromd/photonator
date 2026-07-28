@@ -12,13 +12,16 @@ X, Y, Z, UX, UY, UZ, W, STATUS = range(8)
 ACTIVE = 1
 DETECTED = 0
 TERMINATED = -1
+FLUORESCED = 2   # converted to a fluorescence photon; awaits emission-pass propagation
 
 
 class PhotonBatch:
     """Batch of N photons represented as an N×8 float64 array.
 
     Columns: x_m, y_m, z_m, ux, uy, uz, weight, status
-    status: 1=active, 0=detected, -1=terminated
+    status: 1=active, 0=detected, -1=terminated,
+    2=fluoresced (inelastic conversion; propagated in a second pass
+    at the emission wavelength)
     """
 
     def __init__(self, n: int, rng: np.random.Generator | None = None) -> None:
@@ -83,6 +86,11 @@ class PhotonBatch:
     @property
     def detected_mask(self) -> NDArray[np.bool_]:
         return self._state[:, STATUS] == DETECTED
+
+    @property
+    def fluoresced_mask(self) -> NDArray[np.bool_]:
+        """Photons that underwent inelastic conversion this pass."""
+        return self._state[:, STATUS] == FLUORESCED
 
     # ------------------------------------------------------------------
     # Convenience

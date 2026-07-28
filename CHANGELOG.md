@@ -1,5 +1,50 @@
 # Changelog
 
+## [2.1.0] - 2026-07-28
+
+### Added — Phase 3: inelastic scattering (fluorescence)
+- Fluorescence conversion in `propagate_cpu`: media exposing the inelastic
+  hooks (`inelastic_yield`, `emission_wavelength_nm`,
+  `mu_a_fluorophore_per_m`) convert photons at interactions with
+  probability μ_a,f·QY / (μ_s + μ_a,f·QY); the implicit-capture survival
+  factor grows accordingly. New `FLUORESCED` photon status.
+- Two-pass emission propagation in `Simulation.run`: converted photons are
+  re-emitted isotropically at the emission wavelength and propagated in
+  the host medium (`FluorescentMedium.emission_medium()`), single
+  generation, with path length carried over. Detected on a separate
+  receiver channel: `SimulationResult.fluorescent_power`,
+  `fluorescent_packets`, `fluoresced_photons`, `emission_wavelength_nm`.
+
+### Added — Phase 4: spectral / wideband support
+- `AbstractMedium.at_wavelength(wavelength_nm)` API (identity by default);
+  overridden by `TabulatedMedium` and `Water`.
+- Pope & Fry (1997) pure-water absorption table (400–700 nm) in
+  `media/water.py` with `pope_fry_absorption_m_inv()`; `Water.at_wavelength`
+  interpolates it.
+- `SpectralSimulation` / `SpectralResult` (`photonator/spectral.py`):
+  wavelength-binned wideband sources — one monochromatic run per bin with
+  the medium evaluated at the bin wavelength, weighted by the source
+  spectrum.
+
+### Added — layered propagation (previously suggested enhancement)
+- `propagate_layered_cpu` (`core/propagation_layered.py`): per-layer
+  attenuation/albedo/roulette thresholds, memoryless step re-draw at
+  boundaries, Snell refraction + unpolarised Fresnel reflection + TIR at
+  interfaces, per-layer phase functions via new `Layer.phase_fn` field.
+  `Simulation` dispatches automatically for `LayeredMedium` (CPU backend).
+- `LayeredMedium.layers` public property; `Receiver.clone()`.
+
+### Fixed
+- Pope & Fry 532 nm water absorption default corrected from 0.0088 to
+  0.0442 m⁻¹ (the old value belonged near 450 nm); `Brine` baseline synced.
+
+### Changed
+- `Simulation` raises `NotImplementedError` for `GradientMedium` (needs
+  adaptive sub-stepping; discretise into a `LayeredMedium` instead) and for
+  layered/fluorescent runs on GPU backends.
+- Propagation accumulates path length in `PhotonBatch._path_length_m` so
+  multi-pass runs carry distance across passes.
+
 ## [2.0.1] - 2026-07-28
 
 ### Fixed
