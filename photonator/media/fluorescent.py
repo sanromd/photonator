@@ -106,7 +106,7 @@ class FluorescentMedium(AbstractMedium):
         quantum_yield: float = 1.0,
         stokes_shift_nm: float = 0.0,
         wavelength_nm: float | None = None,
-    ) -> "FluorescentMedium":
+    ) -> FluorescentMedium:
         """Construct from Beer-Lambert molar quantities.
 
         Parameters

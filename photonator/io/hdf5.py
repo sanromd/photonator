@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from photonator.simulation import SimulationResult
 
 
-def save_hdf5(result: "SimulationResult", path: Path | str) -> None:
+def save_hdf5(result: SimulationResult, path: Path | str) -> None:
     """Save a SimulationResult to an HDF5 file.
 
     File structure::
@@ -27,8 +27,10 @@ def save_hdf5(result: "SimulationResult", path: Path | str) -> None:
     result : SimulationResult from Simulation.run()
     path : output file path (.h5 or .hdf5)
     """
-    import h5py
     import datetime
+
+    import h5py
+
     import photonator
 
     path = Path(path)
@@ -64,7 +66,7 @@ def save_hdf5(result: "SimulationResult", path: Path | str) -> None:
 
         # Metadata
         meta = f.create_group("metadata")
-        meta.attrs["timestamp"] = datetime.datetime.utcnow().isoformat()
+        meta.attrs["timestamp"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         meta.attrs["photonator_version"] = photonator.__version__
         try:
             import subprocess

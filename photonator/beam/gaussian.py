@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 
 from photonator.beam.base import AbstractBeam
-from photonator.core.photon import PhotonBatch, X, Y, UX, UY, UZ
+from photonator.core.photon import PhotonBatch
 
 
 class GaussianBeam(AbstractBeam):

@@ -13,6 +13,7 @@ Falls back silently to CPU if CUDA is unavailable (raises ImportError otherwise)
 
 from __future__ import annotations
 
+import math
 import time
 from typing import TYPE_CHECKING
 
@@ -21,12 +22,12 @@ from numpy.typing import NDArray
 
 if TYPE_CHECKING:
     from photonator.core.photon import PhotonBatch
-    from photonator.media.base import AbstractMedium
     from photonator.core.receiver import Receiver
+    from photonator.media.base import AbstractMedium
 
 try:
-    from numba import cuda, float64, int32
-    from numba.cuda.random import create_xoroshiro128p_states, xoroshiro128p_uniform_float64
+    from numba import cuda
+    from numba.cuda.random import create_xoroshiro128p_states
     _NUMBA_AVAILABLE = True
 except ImportError:
     _NUMBA_AVAILABLE = False
@@ -38,12 +39,14 @@ def _make_kernel(inv_c: float, albedo: float, min_w: float, receiver_z: float):
         raise ImportError("numba is required for the CUDA backend. Install with: pip install numba")
 
     from numba import cuda
-    from numba.cuda.random import xoroshiro128p_uniform_float64, xoroshiro128p_normal_float64
+    from numba.cuda.random import xoroshiro128p_uniform_float64
 
     roulette_inv = 1.0 / 10.0
 
     @cuda.jit
-    def _kernel(photon_state, total_dist, rec_loc, rec_dist, cdf_d, angles_d, rng_states, n_photons):
+    def _kernel(
+        photon_state, total_dist, rec_loc, rec_dist, cdf_d, angles_d, rng_states, n_photons
+    ):
         """One thread per photon. Runs the full MC loop for a single photon."""
         i = cuda.grid(1)
         if i >= n_photons:
@@ -142,8 +145,12 @@ def _make_kernel(inv_c: float, albedo: float, min_w: float, receiver_z: float):
                 photon_state[i, 4] = sin_t * sin_p
                 photon_state[i, 5] = (1.0 if uz >= 0 else -1.0) * cos_t
             else:
-                photon_state[i, 3] = (sin_t / sqrt_1_uz2) * (ux * uz * cos_p - uy * sin_p) + ux * cos_t
-                photon_state[i, 4] = (sin_t / sqrt_1_uz2) * (uy * uz * cos_p + ux * sin_p) + uy * cos_t
+                photon_state[i, 3] = (
+                    (sin_t / sqrt_1_uz2) * (ux * uz * cos_p - uy * sin_p) + ux * cos_t
+                )
+                photon_state[i, 4] = (
+                    (sin_t / sqrt_1_uz2) * (uy * uz * cos_p + ux * sin_p) + uy * cos_t
+                )
                 photon_state[i, 5] = -sin_t * cos_p * sqrt_1_uz2 + uz * cos_t
 
             # Normalise
@@ -157,11 +164,11 @@ def _make_kernel(inv_c: float, albedo: float, min_w: float, receiver_z: float):
 
 
 def propagate_numba(
-    batch: "PhotonBatch",
-    medium: "AbstractMedium",
+    batch: PhotonBatch,
+    medium: AbstractMedium,
     cdf: NDArray[np.float64],
     angles_rad: NDArray[np.float64],
-    receiver: "Receiver",
+    receiver: Receiver,
     threads_per_block: int = 256,
     seed: int = 42,
 ) -> tuple[float, NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], int]:
@@ -205,7 +212,9 @@ def propagate_numba(
     blocks = (n + threads_per_block - 1) // threads_per_block
 
     t0 = time.perf_counter()
-    kernel[blocks, threads_per_block](state_d, total_dist_d, rec_loc_d, rec_dist_d, cdf_d, angles_d, rng_states, n)
+    kernel[blocks, threads_per_block](
+        state_d, total_dist_d, rec_loc_d, rec_dist_d, cdf_d, angles_d, rng_states, n
+    )
     cuda.synchronize()
     elapsed_s = time.perf_counter() - t0
 

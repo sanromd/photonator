@@ -1,7 +1,7 @@
 """Test Beer-Lambert transmission in a pure absorber."""
 
 import math
-import numpy as np
+
 import pytest
 
 from photonator.beam.gaussian import GaussianBeam

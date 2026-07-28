@@ -17,7 +17,6 @@ import numpy as np
 
 from photonator.media.base import AbstractMedium
 
-
 # Literature IOR ranges for common oil types
 _OIL_PARAMS: dict[str, dict[str, float]] = {
     "crude": {

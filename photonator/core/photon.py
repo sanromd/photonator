@@ -5,7 +5,6 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
-
 # Column indices into the N×8 state array
 X, Y, Z, UX, UY, UZ, W, STATUS = range(8)
 

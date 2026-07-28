@@ -1,17 +1,15 @@
 """Tests for the CPU propagation loop and direction-cosine update."""
 
 import math
-import numpy as np
-import pytest
 
-from photonator.core.scattering import update_direction
-from photonator.core.photon import PhotonBatch, ACTIVE, DETECTED, TERMINATED
+import numpy as np
+
 from photonator.beam.gaussian import GaussianBeam
 from photonator.core.receiver import Receiver
+from photonator.core.scattering import update_direction
 from photonator.media.water import Water
 from photonator.phase_functions.henyey_greenstein import HenyeyGreensteinPhaseFunction
 from photonator.simulation import Simulation
-
 
 # --- Direction cosine update tests ---
 
@@ -24,7 +22,9 @@ def test_update_direction_unit_vector() -> None:
     uz = np.sqrt(np.maximum(1.0 - ux**2 - uy**2, 0.0))
     # Re-normalise
     norm = np.sqrt(ux**2 + uy**2 + uz**2)
-    ux /= norm; uy /= norm; uz /= norm
+    ux /= norm
+    uy /= norm
+    uz /= norm
 
     theta = rng.uniform(0, np.pi, n)
     phi = rng.uniform(0, 2 * np.pi, n)
@@ -56,7 +56,9 @@ def test_update_direction_zero_scattering() -> None:
     uy = rng.uniform(-0.5, 0.5, n)
     uz = np.sqrt(np.maximum(1 - ux**2 - uy**2, 0.0))
     norm = np.sqrt(ux**2 + uy**2 + uz**2)
-    ux /= norm; uy /= norm; uz /= norm
+    ux /= norm
+    uy /= norm
+    uz /= norm
 
     theta = np.zeros(n)
     phi = rng.uniform(0, 2 * np.pi, n)
@@ -112,3 +114,62 @@ def test_gaussian_beam_positions_on_axis() -> None:
     np.testing.assert_allclose(batch.x_m, 0.0, atol=1e-14)
     np.testing.assert_allclose(batch.y_m, 0.0, atol=1e-14)
     np.testing.assert_allclose(batch.uz, 1.0, atol=1e-14)
+
+
+# --- Per-photon direction continuity (regression for index-remap bug) ---
+
+class _FlipEveryTenthPhaseFunction(HenyeyGreensteinPhaseFunction):
+    """theta = pi for every 10th sample, 0 otherwise.
+
+    Flipped photons reverse direction exactly (theta=pi is a pure negation
+    of the direction vector) and drift backward until the z<0 filter
+    terminates them MID-LOOP while other photons continue -- exactly the
+    condition under which the old index-remapping bug paired surviving
+    photons with other photons' previous directions.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(g=0.0)
+
+    def sample(self, n: int, rng: np.random.Generator) -> np.ndarray:
+        theta = np.zeros(n, dtype=np.float64)
+        theta[::10] = np.pi
+        return theta
+
+
+def test_direction_continuity_under_terminations() -> None:
+    """Each detected photon must arrive with ITS OWN initial direction.
+
+    Under theta in {0, pi} scattering every photon's direction is always
+    +/- its initial vector, and crossing the receiver plane (uz > 0)
+    requires the + sign -- so detected direction == initial direction,
+    photon by photon.  Mid-loop z<0 and roulette terminations shift the
+    filter frames every iteration; the old bug then rotated survivors
+    from other photons' directions and broke this equality.
+    """
+    from photonator.core.propagation import propagate_cpu
+
+    n = 5_000
+    rng = np.random.default_rng(123)
+    beam = GaussianBeam(w0_m=0.001, half_angle_divergence_rad=0.01)
+    batch = beam.initialize(n, rng)
+    ux0 = batch.ux.copy()
+    uy0 = batch.uy.copy()
+    uz0 = batch.uz.copy()
+
+    medium = Water(mu_a_per_m=0.5, mu_s_per_m=0.5)
+    receiver = Receiver(receiver_z_m=10.0, aperture_m=1e6, fov_rad=math.pi)
+
+    _, rec_loc, _, _, n_packets = propagate_cpu(
+        batch, medium, _FlipEveryTenthPhaseFunction(), receiver
+    )
+
+    # The scenario must exercise both outcomes: detections AND mid-loop
+    # terminations (backward-drifting photons exiting z<0, plus roulette).
+    assert n_packets > 0, "no photons detected -- scenario broken"
+    assert n_packets < n, "no photons terminated -- filters never fired"
+
+    det = batch.detected_mask
+    np.testing.assert_allclose(rec_loc[:, 2], ux0[det], atol=1e-6)
+    np.testing.assert_allclose(rec_loc[:, 3], uy0[det], atol=1e-6)
+    np.testing.assert_allclose(rec_loc[:, 4], uz0[det], atol=1e-6)

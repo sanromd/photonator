@@ -3,10 +3,10 @@
 import numpy as np
 import pytest
 
-from photonator.beam.laguerre import LaguerreGaussianBeam
-from photonator.beam.bessel import BesselBeam
 from photonator.beam.airy import AiryBeam
+from photonator.beam.bessel import BesselBeam
 from photonator.beam.gaussian import GaussianBeam
+from photonator.beam.laguerre import LaguerreGaussianBeam
 
 RNG = np.random.default_rng(42)
 N = 50_000

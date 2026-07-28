@@ -5,7 +5,6 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
-
 _MAX_UZ: float = 1.0 - 1e-12
 
 

@@ -3,6 +3,8 @@
 All values sourced from scipy.constants where available.
 """
 
+import math as _math
+
 import scipy.constants as _sc
 
 # Speed of light in vacuum (m/s)
@@ -15,7 +17,6 @@ N_WINDOW_POLYCARBONATE: float = 1.585
 
 # Derived: critical angle cosine for water→air interface
 # sin(theta_c) = n_air / n_water  →  cos(theta_c) = sqrt(1 - (n_air/n_water)^2)
-import math as _math
 CRIT_ANG_COS_WATER_AIR: float = _math.sqrt(1.0 - (N_AIR / N_WATER) ** 2)
 
 # Roulette constants (matching original MATLAB implementation)

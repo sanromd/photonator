@@ -3,12 +3,11 @@
 import numpy as np
 import pytest
 
-from photonator.media.layers import Layer, LayeredMedium, GradientMedium
-from photonator.media.water import Water
-from photonator.media.oil import Oil
 from photonator.media.brine import Brine, quan_fry_n
+from photonator.media.layers import GradientMedium, Layer, LayeredMedium
 from photonator.media.mixture import MixtureMedium
-
+from photonator.media.oil import Oil
+from photonator.media.water import Water
 
 # --- LayeredMedium tests ---
 

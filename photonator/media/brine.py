@@ -10,10 +10,7 @@ with an empirical salinity correction.
 
 from __future__ import annotations
 
-import math
-
 from photonator.media.base import AbstractMedium
-
 
 # Quan & Fry (1995) coefficients for NaCl brine (seawater model)
 _QF_N0 = 1.31405

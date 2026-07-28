@@ -11,8 +11,8 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
-from photonator.phase_functions.base import AbstractPhaseFunction
 from photonator.io.mat_loader import load_hdf5_array
+from photonator.phase_functions.base import AbstractPhaseFunction
 
 # data/ directory relative to repo root (three levels up from this file)
 _DATA_DIR = Path(__file__).parent.parent.parent / "data"

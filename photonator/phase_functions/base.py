@@ -43,6 +43,29 @@ class AbstractPhaseFunction(ABC):
         theta : float64 array of shape (n,), values in [0, π]
         """
 
+    def cdf_table(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Return (cdf, angles_rad) for tabulated inverse-transform sampling.
+
+        The default implementation returns the ``_cdf`` / ``_angles_rad``
+        arrays built at construction time by tabulated phase functions
+        (Petzold, Mie).  Analytical phase functions should override this
+        to build a dense table on demand — the GPU backends need a table
+        even when CPU sampling is analytical.
+
+        Raises
+        ------
+        NotImplementedError
+            If the phase function has no tabulated CDF and does not
+            override this method.
+        """
+        cdf = getattr(self, "_cdf", None)
+        angles = getattr(self, "_angles_rad", None)
+        if cdf is None or angles is None:
+            raise NotImplementedError(
+                f"{type(self).__name__} has no tabulated CDF; override cdf_table()."
+            )
+        return cdf, angles
+
     def build_cdf(
         self,
         angles_rad: NDArray[np.float64],

@@ -7,7 +7,7 @@ pluggable beam, medium, phase function, and GPU backend support.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
@@ -18,7 +18,6 @@ from photonator.core.propagation import propagate_cpu
 from photonator.core.receiver import Receiver
 from photonator.media.base import AbstractMedium
 from photonator.phase_functions.base import AbstractPhaseFunction
-
 
 Backend = Literal["cpu", "numba", "cupy"]
 
@@ -115,7 +114,7 @@ class Simulation:
                 )
             elif self.backend == "numba":
                 from photonator.gpu.propagation_numba import propagate_numba
-                cdf, angles_rad = _get_cdf(self.phase_fn)
+                cdf, angles_rad = self.phase_fn.cdf_table()
                 _elapsed, rec_loc, distances_m, rec_weights, _n_packets = propagate_numba(
                     batch, self.medium, cdf, angles_rad, self.receiver,
                     seed=self.seed + batch_idx,
@@ -154,17 +153,3 @@ class Simulation:
             result.rec_weights = np.concatenate(all_weights)
 
         return result
-
-
-def _get_cdf(
-    phase_fn: AbstractPhaseFunction,
-) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    """Return the CDF and angle array from a phase function (for Numba kernel)."""
-    if hasattr(phase_fn, "_cdf") and hasattr(phase_fn, "_angles_rad"):
-        return phase_fn._cdf, phase_fn._angles_rad
-    # Build from HG formula
-    g = getattr(phase_fn, "g", 0.0)
-    theta = np.concatenate([np.arange(0, 10, 0.01), np.arange(10.1, 180.1, 0.1)]) * np.pi / 180.0
-    gsqr = g**2
-    vsf = (1.0 - gsqr) / (4.0 * np.pi * (1.0 + gsqr - 2.0 * g * np.cos(theta)) ** 1.5)
-    return phase_fn.build_cdf(theta, vsf)

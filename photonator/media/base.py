@@ -67,7 +67,7 @@ class AbstractMedium(ABC):
         return self.mu_s_per_m / c if c > 0 else 0.0
 
     @classmethod
-    def from_file(cls, path: Path | str) -> "TabulatedMedium":
+    def from_file(cls, path: Path | str) -> TabulatedMedium:
         """Load a custom medium from an HDF5 or CSV spectral file.
 
         The file must contain columns/datasets:
@@ -127,7 +127,7 @@ class TabulatedMedium(AbstractMedium):
         return self._interp(self._n)
 
     @classmethod
-    def load(cls, path: Path) -> "TabulatedMedium":
+    def load(cls, path: Path) -> TabulatedMedium:
         """Load from HDF5 or CSV; wavelength_nm defaults to first entry."""
         if path.suffix in {".h5", ".hdf5"}:
             import h5py

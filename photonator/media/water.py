@@ -7,9 +7,8 @@ IOR: n = 1.33 (seawater at visible wavelengths, matching MATLAB).
 
 from __future__ import annotations
 
-from photonator.media.base import AbstractMedium
 from photonator.constants import N_WATER
-
+from photonator.media.base import AbstractMedium
 
 # Pope & Fry (1997) absorption at 532 nm: 0.0088 m^-1
 # Segelstein (1981) value at 532 nm: ~0.0093 m^-1

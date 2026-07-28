@@ -16,9 +16,9 @@ import numpy as np
 
 if TYPE_CHECKING:
     from photonator.core.photon import PhotonBatch
-    from photonator.phase_functions.base import AbstractPhaseFunction
-    from photonator.media.base import AbstractMedium
     from photonator.core.receiver import Receiver
+    from photonator.media.base import AbstractMedium
+    from photonator.phase_functions.base import AbstractPhaseFunction
 
 try:
     import cupy as cp
@@ -28,10 +28,10 @@ except ImportError:
 
 
 def propagate_cupy(
-    batch: "PhotonBatch",
-    medium: "AbstractMedium",
-    phase_fn: "AbstractPhaseFunction",
-    receiver: "Receiver",
+    batch: PhotonBatch,
+    medium: AbstractMedium,
+    phase_fn: AbstractPhaseFunction,
+    receiver: Receiver,
 ) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, int]:
     """Run MC propagation on GPU using CuPy vectorized arrays.
 
@@ -161,13 +161,16 @@ def propagate_cupy(
             near_axis = cp.abs(old_uz) > MAX_UZ
             sqrt_1_uz2 = cp.sqrt(cp.maximum(1.0 - old_uz**2, 0.0))
 
+            safe_sqrt = cp.where(sqrt_1_uz2 > 1e-15, sqrt_1_uz2, 1.0)
             ux_new = cp.where(
                 near_axis, sin_t * cos_p,
-                (sin_t / cp.where(sqrt_1_uz2 > 1e-15, sqrt_1_uz2, 1.0)) * (old_ux * old_uz * cos_p - old_uy * sin_p) + old_ux * cos_t,
+                (sin_t / safe_sqrt) * (old_ux * old_uz * cos_p - old_uy * sin_p)
+                + old_ux * cos_t,
             )
             uy_new = cp.where(
                 near_axis, sin_t * sin_p,
-                (sin_t / cp.where(sqrt_1_uz2 > 1e-15, sqrt_1_uz2, 1.0)) * (old_uy * old_uz * cos_p + old_ux * sin_p) + old_uy * cos_t,
+                (sin_t / safe_sqrt) * (old_uy * old_uz * cos_p + old_ux * sin_p)
+                + old_uy * cos_t,
             )
             uz_new = cp.where(
                 near_axis, cp.sign(old_uz) * cos_t,

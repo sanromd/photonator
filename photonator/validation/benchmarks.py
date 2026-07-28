@@ -8,7 +8,6 @@ import numpy as np
 from scipy.stats import kstest  # type: ignore[import]
 
 from photonator.beam.gaussian import GaussianBeam
-from photonator.core.propagation import propagate_cpu
 from photonator.core.receiver import Receiver
 from photonator.media.water import Water
 from photonator.phase_functions.henyey_greenstein import HenyeyGreensteinPhaseFunction
@@ -96,31 +95,27 @@ def hg_ks_test(
     phase_fn = HenyeyGreensteinPhaseFunction(g=g)
     theta_samples = phase_fn.sample(n_samples, rng)
 
-    # Analytical CDF: F(theta) = (1 - g^2) * integral(...)
-    # Equivalently: CDF of cos_theta is uniform transformation
-    # CDF(cos_t) = (1/(2g)) * [1 + g - sqrt(1+g^2-2g*cos_t)] / (1 - 1/(1+g^2-2g))
-    # Use empirical approach: compare against sample from a fresh generator
-    def hg_cdf(t: np.ndarray) -> np.ndarray:
-        cos_t = np.cos(t)
-        if abs(g) < 1e-12:
-            return (1.0 - cos_t) / 2.0
-        num = 1.0 + g**2 - ((1.0 - g**2) / (1.0 + g - 2.0 * g * cos_t)) ** 2  # noqa
-        # Use the known analytical form directly on cos_theta
-        cos_t_clipped = np.clip(cos_t, -1.0, 1.0)
-        term = (1.0 - g**2) / (1.0 + g - 2.0 * g * cos_t_clipped)
-        cdf_cos = (1.0 - term + g * (1.0 - term**2 / (1.0 + g**2 - 2.0 * g * cos_t_clipped))) / (2.0 * g)
-        # Simpler: CDF(theta) = P(Theta <= theta)
-        # For HG: P(Theta <= theta) = P(cos(Theta) >= cos(theta))
-        # since theta increasing means cos decreasing
-        # Integrate p(theta)sin(theta) from 0 to theta numerically
-        return np.clip(cdf_cos, 0.0, 1.0)
-
-    stat, p_value = kstest(np.cos(theta_samples), lambda x: np.clip(
-        (1 + g**2 - ((1 - g**2) / (1 + g - 2 * g * np.clip(x, -1, 1)))**2) / (2 * g * (1 + g**2 - 2 * g * np.clip(x, -1, 1))),
-        0.0, 1.0,
-    ) if abs(g) > 1e-12 else (1 - np.clip(x, -1, 1)) / 2.0)
-
+    stat, p_value = kstest(np.cos(theta_samples), lambda mu: hg_cos_cdf(mu, g))
     return {"statistic": float(stat), "p_value": float(p_value), "passed": p_value > alpha}
+
+
+def hg_cos_cdf(mu, g: float):
+    """Closed-form CDF of cos(θ) for the Henyey-Greenstein phase function.
+
+    For μ = cos θ with density p(μ) = (1-g²) / (2·(1+g² - 2gμ)^{3/2}):
+
+        F(μ) = (1-g²)/(2g) · [ (1+g² - 2gμ)^{-1/2} − (1+g)^{-1} ]
+
+    which satisfies F(-1) = 0 and F(1) = 1.  For g = 0 the distribution
+    is uniform on [-1, 1]: F(μ) = (μ + 1)/2.
+    """
+    mu = np.clip(mu, -1.0, 1.0)
+    if abs(g) < 1e-12:
+        return (mu + 1.0) / 2.0
+    cdf = (1.0 - g**2) / (2.0 * g) * (
+        1.0 / np.sqrt(1.0 + g**2 - 2.0 * g * mu) - 1.0 / (1.0 + g)
+    )
+    return np.clip(cdf, 0.0, 1.0)
 
 
 def lambertian_power_test(

@@ -13,21 +13,26 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy.typing import NDArray
 
-from photonator.core.photon import PhotonBatch, ACTIVE, DETECTED, TERMINATED, X, Y, Z, UX, UY, UZ, W, STATUS
-from photonator.core.scattering import update_direction
 from photonator.constants import ROULETTE_CONST, ROULETTE_CONST_INV, min_weight_for_albedo
+from photonator.core.photon import (
+    ACTIVE,
+    DETECTED,
+    TERMINATED,
+    PhotonBatch,
+)
+from photonator.core.scattering import update_direction
 
 if TYPE_CHECKING:
-    from photonator.phase_functions.base import AbstractPhaseFunction
-    from photonator.media.base import AbstractMedium
     from photonator.core.receiver import Receiver
+    from photonator.media.base import AbstractMedium
+    from photonator.phase_functions.base import AbstractPhaseFunction
 
 
 def propagate_cpu(
     batch: PhotonBatch,
-    medium: "AbstractMedium",
-    phase_fn: "AbstractPhaseFunction",
-    receiver: "Receiver",
+    medium: AbstractMedium,
+    phase_fn: AbstractPhaseFunction,
+    receiver: Receiver,
     rx_plane_limits: bool = True,
     rx_x_lim_m: tuple[float, float] = (-3.0, 3.0),
     rx_y_lim_m: tuple[float, float] = (-3.0, 3.0),
@@ -146,11 +151,16 @@ def propagate_cpu(
         no_cross = ~crossed
         if np.any(no_cross):
             ncidx = idx[no_cross]
+            # Positions into the active-frame arrays (r, theta, phi, ux_a, ...).
+            # Filtered in lockstep with ncidx so both stay aligned; indexing the
+            # active-frame arrays with a mask derived from a *filtered* ncidx
+            # would silently pair photons with other photons' angles/directions.
+            sel = np.where(no_cross)[0]
             # Move photons
-            batch.x_m[ncidx] = x_a[no_cross] + x_step[no_cross]
-            batch.y_m[ncidx] = y_a[no_cross] + y_step[no_cross]
-            batch.z_m[ncidx] = new_z[no_cross]
-            total_dist[ncidx] += r[no_cross]
+            batch.x_m[ncidx] = x_a[sel] + x_step[sel]
+            batch.y_m[ncidx] = y_a[sel] + y_step[sel]
+            batch.z_m[ncidx] = new_z[sel]
+            total_dist[ncidx] += r[sel]
 
             # Terminate photons that backscattered past z=0
             below_zero = batch.z_m[ncidx] < 0.0
@@ -158,6 +168,7 @@ def propagate_cpu(
 
             still_active = ~below_zero
             ncidx = ncidx[still_active]
+            sel = sel[still_active]
             if len(ncidx) == 0:
                 continue
 
@@ -169,6 +180,7 @@ def propagate_cpu(
             if np.any(zero_weight):
                 batch.status[ncidx[zero_weight]] = float(TERMINATED)
                 ncidx = ncidx[~zero_weight]
+                sel = sel[~zero_weight]
             if len(ncidx) == 0:
                 continue
 
@@ -184,20 +196,17 @@ def propagate_cpu(
             # Re-check still active after roulette
             still_act_mask = batch.status[ncidx] == ACTIVE
             ncidx = ncidx[still_act_mask]
+            sel = sel[still_act_mask]
             if len(ncidx) == 0:
                 continue
 
             # Update direction cosines
-            local_mask = np.isin(idx[no_cross], ncidx)
-            # Rebuild index maps
-            nc_pos_in_no_cross = np.where(still_act_mask)[0]
-
             ux_new, uy_new, uz_new = update_direction(
-                ux_a[no_cross][nc_pos_in_no_cross],
-                uy_a[no_cross][nc_pos_in_no_cross],
-                uz_a[no_cross][nc_pos_in_no_cross],
-                theta[no_cross][nc_pos_in_no_cross],
-                phi[no_cross][nc_pos_in_no_cross],
+                ux_a[sel],
+                uy_a[sel],
+                uz_a[sel],
+                theta[sel],
+                phi[sel],
             )
             batch.ux[ncidx] = ux_new
             batch.uy[ncidx] = uy_new

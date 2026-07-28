@@ -7,12 +7,44 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.typing import NDArray
 
-from photonator.constants import N_AIR, N_WATER, CRIT_ANG_COS_WATER_AIR
-
+from photonator.constants import N_AIR, N_WATER
 
 # Two-term Gaussian FOV weighting from mc_rec_r5.m
 _A1, _B1, _C1 = 0.7985, 0.0187, 0.03437
 _A2, _B2, _C2 = 0.7121, -0.02337, 0.03117
+
+
+def _welford_merge(
+    mean_a: float,
+    m2_a: float,
+    n_a: int,
+    values: NDArray[np.float64],
+) -> tuple[float, float]:
+    """Merge a batch of samples into running Welford (mean, M2) accumulators.
+
+    Chan, Golub & LeVeque (1983) parallel update: equivalent to feeding the
+    samples one-by-one through Welford's algorithm, but fully vectorized.
+
+    Parameters
+    ----------
+    mean_a, m2_a : current running mean and sum of squared deviations
+    n_a : number of samples already accumulated
+    values : new batch of samples, shape (m,)
+
+    Returns
+    -------
+    (mean, M2) : updated accumulators for n_a + m samples
+    """
+    m = int(values.size)
+    if m == 0:
+        return mean_a, m2_a
+    mean_b = float(np.mean(values))
+    m2_b = float(np.sum((values - mean_b) ** 2))
+    n = n_a + m
+    delta = mean_b - mean_a
+    mean = mean_a + delta * m / n
+    m2 = m2_a + m2_b + delta * delta * n_a * m / n
+    return mean, m2
 
 
 @dataclass
@@ -113,7 +145,9 @@ class Receiver:
         dist_k = distances_m[keep]
 
         # Fresnel transmission
-        cos_exit = np.sqrt(np.maximum(1.0 - (self.n_water / self.n_air) ** 2 * (1.0 - mu_z_k**2), 0.0))
+        cos_exit = np.sqrt(
+            np.maximum(1.0 - (self.n_water / self.n_air) ** 2 * (1.0 - mu_z_k**2), 0.0)
+        )
         rp = (mu_z_k - self.n_water * cos_exit) / (mu_z_k + self.n_water * cos_exit)
         rs = (cos_exit - self.n_water * mu_z_k) / (cos_exit + self.n_water * mu_z_k)
         R = (rp**2 + rs**2) / 2.0
@@ -140,25 +174,21 @@ class Receiver:
         )
         w_final = w_v * fov_w
 
-        # Welford online mean/variance for angle, distance, weight
-        for i in range(len(w_final)):
-            self._count += 1
-            n = self._count
-            ang = float(mu_z_v[i])
-            dist = float(dist_v[i])
-            wt = float(w_final[i])
-
-            d_ang = ang - self._angle_mean
-            self._angle_mean += d_ang / n
-            self._angle_M2 += d_ang * (ang - self._angle_mean)
-
-            d_dist = dist - self._dist_mean
-            self._dist_mean += d_dist / n
-            self._dist_M2 += d_dist * (dist - self._dist_mean)
-
-            d_wt = wt - self._weight_mean
-            self._weight_mean += d_wt / n
-            self._weight_M2 += d_wt * (wt - self._weight_mean)
+        # Vectorized Welford: compute batch mean/M2, then merge into the
+        # running accumulators via Chan et al.'s parallel-update formula.
+        m = int(w_final.size)
+        if m > 0:
+            n_a = self._count
+            self._angle_mean, self._angle_M2 = _welford_merge(
+                self._angle_mean, self._angle_M2, n_a, mu_z_v
+            )
+            self._dist_mean, self._dist_M2 = _welford_merge(
+                self._dist_mean, self._dist_M2, n_a, dist_v
+            )
+            self._weight_mean, self._weight_M2 = _welford_merge(
+                self._weight_mean, self._weight_M2, n_a, w_final
+            )
+            self._count = n_a + m
 
         self._power += float(np.sum(w_final))
 

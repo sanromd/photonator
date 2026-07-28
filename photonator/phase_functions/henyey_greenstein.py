@@ -42,3 +42,21 @@ class HenyeyGreensteinPhaseFunction(AbstractPhaseFunction):
 
         theta = np.arccos(cos_theta)
         return theta.astype(np.float64)
+
+    def cdf_table(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Build a dense tabulated CDF from the analytical HG formula.
+
+        Used by GPU backends, which sample from a table rather than
+        inverting the CDF analytically per thread.  Grid matches the
+        original MATLAB generate_scatter.m: 0.01° steps to 10°, then
+        0.1° steps to 180°.
+        """
+        g = self.g
+        theta = (
+            np.concatenate([np.arange(0, 10, 0.01), np.arange(10.1, 180.1, 0.1)])
+            * np.pi
+            / 180.0
+        )
+        gsqr = g**2
+        vsf = (1.0 - gsqr) / (4.0 * np.pi * (1.0 + gsqr - 2.0 * g * np.cos(theta)) ** 1.5)
+        return self.build_cdf(theta, vsf)

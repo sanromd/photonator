@@ -3,10 +3,9 @@
 import numpy as np
 import pytest
 
-from photonator.media.oil import Oil, DispersiveOil, _CAUCHY, _OIL_PARAMS
 from photonator.media.fluorescent import FluorescentMedium
+from photonator.media.oil import _CAUCHY, _OIL_PARAMS, DispersiveOil, Oil
 from photonator.media.water import Water
-
 
 # ── DispersiveOil ─────────────────────────────────────────────────────────────
 

@@ -31,9 +31,9 @@ Working branch: `claude/refactor-photonator-python-nnre4`
 - `Simulation` orchestrator (`simulation.py`): n_batches × n_photons, pluggable beam/medium/phase_fn/receiver, CPU/GPU dispatch.
 - `Receiver` (`core/receiver.py`): Fresnel transmission, TIR test, aperture, FOV cone, Welford online stats.
 
-**Beams** — `GaussianBeam` fully implemented (Rayleigh CDF, thin-lens divergence); `LaguerreGaussianBeam`, `BesselBeam`, `AiryBeam` are class stubs with physics documented but sampling not implemented.
+**Beams** — all four implemented and unit-tested (`tests/test_beams.py`): `GaussianBeam` (Rayleigh CDF, thin-lens divergence), `LaguerreGaussianBeam`, `BesselBeam`, `AiryBeam` (rejection sampling from their intensity profiles).
 
-**Phase functions** — `HenyeyGreenstein` (analytical CDF), `PetzoldPhaseFunction` (tabulated ocean VSF from `.mat`), `MiePhaseFunction` (tabulated). `TwoTermHGPhaseFunction` and `UserDefinedPhaseFunction` are documented but absent from codebase.
+**Phase functions** — `HenyeyGreenstein` (analytical CDF), `PetzoldPhaseFunction` (tabulated ocean VSF from `.mat`), `MiePhaseFunction` (tabulated); public `cdf_table()` API for GPU backends. `TwoTermHGPhaseFunction` and `UserDefinedPhaseFunction` are documented but absent from codebase.
 
 **Media** — `Water` (Pope & Fry), `Oil`, `Brine` (Quan & Fry 1995), `MixtureMedium`, `LayeredMedium`/`GradientMedium` — all fully implemented.
 

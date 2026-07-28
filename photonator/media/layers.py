@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import numpy as np
 
@@ -76,7 +76,7 @@ class LayeredMedium(AbstractMedium):
     def n(self) -> float:
         return self._current_medium().n
 
-    def set_query_z(self, z_m: float) -> "LayeredMedium":
+    def set_query_z(self, z_m: float) -> LayeredMedium:
         """Set the axial position for property queries (returns self)."""
         self._query_z_m = z_m
         return self
@@ -124,7 +124,7 @@ class GradientMedium(AbstractMedium):
         self._n_func = n_func
         self._query_z_m = query_z_m
 
-    def set_query_z(self, z_m: float) -> "GradientMedium":
+    def set_query_z(self, z_m: float) -> GradientMedium:
         self._query_z_m = z_m
         return self
 

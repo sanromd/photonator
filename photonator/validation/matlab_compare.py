@@ -49,6 +49,7 @@ def compare(
     dict with comparison metrics and pass/fail flags
     """
     import scipy.io as sio
+
     from photonator.beam.gaussian import GaussianBeam
     from photonator.core.receiver import Receiver
     from photonator.media.water import Water

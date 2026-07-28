@@ -1,11 +1,11 @@
 """Tests for the Receiver class."""
 
 import math
-import numpy as np
-import pytest
 
+import numpy as np
+
+from photonator.constants import CRIT_ANG_COS_WATER_AIR
 from photonator.core.receiver import Receiver
-from photonator.constants import N_WATER, N_AIR, CRIT_ANG_COS_WATER_AIR
 
 
 def _make_on_axis_photons(n: int, mu_z: float = 0.98) -> tuple:
